@@ -60,19 +60,19 @@ input,select{width:100%;padding:10px;font-size:16px;border:1px solid var(--line)
 </div>
 <script>
 const S={mode:'parchi',parchi:[],tuli:[]};
-const NOTES={parchi:'Kanda parchi: kilo ya quintal daalein. Bags = kilos ÷ bharti. Amount = quintal × rate. Actual = Amount − (bags × labour).',
+const NOTES={parchi:'Kanda parchi: wazan daalein, phir kaat (kg per quintal) katega. Net kilos ÷ bharti = bags. Amount = quintal × rate. Actual = Amount − (bags × labour).',
 tuli:'Hath se tuli: bags aur upar ke extra kilos daalein. Total kilos = (bags × bharti) + extra kilos. Labour sirf bags par kategi.'};
 const n=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
 const fmt=(v,d=2)=>v.toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
 const rs=v=>'₹ '+fmt(v);
 const trim=v=>v.toLocaleString('en-IN',{maximumFractionDigits:2});
-function blank(prev){return Object.assign({name:'',unit:'kg',w:'',bags:'',extra:'',bharti:'37.5',rate:'',labour:''},prev?{unit:prev.unit,bharti:prev.bharti,rate:prev.rate,labour:prev.labour}:{})}
+function blank(prev){return Object.assign({name:'',unit:'kg',w:'',bags:'',extra:'',bharti:'37.5',rate:'',labour:'',kaat:''},prev?{unit:prev.unit,bharti:prev.bharti,rate:prev.rate,labour:prev.labour,kaat:prev.kaat}:{})}
 function calc(r){
-  let kg,bags;
-  if(S.mode==='parchi'){kg=r.unit==='qtl'?n(r.w)*100:n(r.w);bags=kg/n(r.bharti)}
-  else{bags=n(r.bags);kg=bags*n(r.bharti)+n(r.extra)}
+  let kg,bags,gross,kaatKg=0;
+  if(S.mode==='parchi'){gross=r.unit==='qtl'?n(r.w)*100:n(r.w);kaatKg=gross/100*n(r.kaat);kg=gross-kaatKg;bags=kg/n(r.bharti)}
+  else{bags=n(r.bags);kg=bags*n(r.bharti)+n(r.extra);gross=kg}
   const qtl=kg/100,amt=qtl*n(r.rate),lab=bags*n(r.labour);
-  return{kg,bags,qtl,amt,lab,net:amt-lab};
+  return{gross,kaatKg,kg,bags,qtl,amt,lab,net:amt-lab};
 }
 function cur(){return S[S.mode]}
 function render(){
@@ -82,7 +82,8 @@ function render(){
     const c=document.createElement('div');c.className='card';
     const wf=S.mode==='parchi'
       ?`<div class="f"><label>Wazan daalein</label><input data-k="w" type="number" inputmode="decimal" value="${r.w}" placeholder="0"></div>
-        <div class="f"><label>Unit</label><select data-k="unit"><option value="kg"${r.unit==='kg'?' selected':''}>Kilo (kg)</option><option value="qtl"${r.unit==='qtl'?' selected':''}>Quintal</option></select></div>`
+        <div class="f"><label>Unit</label><select data-k="unit"><option value="kg"${r.unit==='kg'?' selected':''}>Kilo (kg)</option><option value="qtl"${r.unit==='qtl'?' selected':''}>Quintal</option></select></div>
+        <div class="f full"><label>Kaat (kg per quintal)</label><input data-k="kaat" type="number" inputmode="decimal" value="${r.kaat}" placeholder="0"></div>`
       :`<div class="f"><label>Bags</label><input data-k="bags" type="number" inputmode="decimal" value="${r.bags}" placeholder="0"></div>
         <div class="f"><label>Extra Kilos</label><input data-k="extra" type="number" inputmode="decimal" value="${r.extra}" placeholder="0"></div>`;
     c.innerHTML=`<div class="ch"><span>${S.mode==='parchi'?'Parchi':'Tuli'} #${i+1}</span><button class="x" data-del="${i}">✕ Hatayein</button></div>
@@ -102,11 +103,11 @@ function render(){
 }
 function upd(){
   const cards=document.querySelectorAll('#list .card');
-  let T={kg:0,bags:0,qtl:0,amt:0,lab:0,net:0};
+  let T={gross:0,kaatKg:0,kg:0,bags:0,qtl:0,amt:0,lab:0,net:0};
   cur().forEach((r,i)=>{
     const c=calc(r);for(const k in T)T[k]+=c[k];
     cards[i].querySelector('.res').innerHTML=
-     `<div><span>Total Kilos</span><b>${trim(c.kg)} kg</b></div>
+     `${S.mode==='parchi'?`<div><span>Parchi Wazan</span><b>${trim(c.gross)} kg</b></div><div><span>Kaat</span><b>− ${trim(c.kaatKg)} kg</b></div>`:''}<div><span>${S.mode==='parchi'?'Net Kilos':'Total Kilos'}</span><b>${trim(c.kg)} kg</b></div>
       <div><span>Bags</span><b>${trim(c.bags)}</b></div>
       <div><span>Quintal</span><b>${fmt(c.qtl,3)} qtl</b></div>
       <div><span>Amount</span><b>${rs(c.amt)}</b></div>
@@ -115,7 +116,7 @@ function upd(){
   });
   document.getElementById('tot').innerHTML=
    `<h2>Kul Hisaab (${cur().length} ${S.mode==='parchi'?'parchi':'tuli'})</h2>
-    <div><span>Total Kilos</span><b>${trim(T.kg)} kg</b></div>
+    ${S.mode==='parchi'?`<div><span>Parchi Wazan</span><b>${trim(T.gross)} kg</b></div><div><span>Total Kaat</span><b>− ${trim(T.kaatKg)} kg</b></div>`:''}<div><span>${S.mode==='parchi'?'Net Kilos':'Total Kilos'}</span><b>${trim(T.kg)} kg</b></div>
     <div><span>Total Bags</span><b>${trim(T.bags)}</b></div>
     <div><span>Total Quintal</span><b>${fmt(T.qtl,3)}</b></div>
     <div><span>Total Amount</span><b>${rs(T.amt)}</b></div>
@@ -133,14 +134,14 @@ const esc=s=>String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[
 function rows(){return cur().map((r,i)=>({no:i+1,name:r.name,...calc(r),rate:n(r.rate),labour:n(r.labour),bharti:n(r.bharti)}))}
 function billHtml(){
   const R=rows(),T=window._T,d=new Date().toLocaleDateString('en-IN');
-  const tr=R.map(x=>`<tr><td>${x.no}</td><td>${esc(x.name)}</td><td>${trim(x.kg)}</td><td>${trim(x.bags)}</td><td>${fmt(x.qtl,3)}</td><td>${fmt(x.rate)}</td><td>${fmt(x.amt)}</td><td>${fmt(x.lab)}</td><td><b>${fmt(x.net)}</b></td></tr>`).join('');
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gill’s Calculator Bill</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #999;padding:6px;text-align:right}th{background:#eee}td:nth-child(2){text-align:left}tfoot td{font-weight:bold;background:#f4f4f4}</style></head><body><h2>Gill’s Calculator — ${S.mode==='parchi'?'Kanda Parchi':'Hath se Tuli'} Hisaab</h2><p>Date: ${d}</p><table><thead><tr><th>#</th><th>Party</th><th>Kilos</th><th>Bags</th><th>Quintal</th><th>Rate/qtl</th><th>Amount</th><th>Labour</th><th>Actual</th></tr></thead><tbody>${tr}</tbody><tfoot><tr><td colspan="2">Total</td><td>${trim(T.kg)}</td><td>${trim(T.bags)}</td><td>${fmt(T.qtl,3)}</td><td></td><td>${fmt(T.amt)}</td><td>${fmt(T.lab)}</td><td>${fmt(T.net)}</td></tr></tfoot></table><p style="margin-top:14px;font-size:12px">Print karke "Save as PDF" bhi kar sakte hain.</p></body></html>`;
+  const tr=R.map(x=>`<tr><td>${x.no}</td><td>${esc(x.name)}</td><td>${trim(x.gross)}</td><td>${trim(x.kaatKg)}</td><td>${trim(x.kg)}</td><td>${trim(x.bags)}</td><td>${fmt(x.qtl,3)}</td><td>${fmt(x.rate)}</td><td>${fmt(x.amt)}</td><td>${fmt(x.lab)}</td><td><b>${fmt(x.net)}</b></td></tr>`).join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gill’s Calculator Bill</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #999;padding:6px;text-align:right}th{background:#eee}td:nth-child(2){text-align:left}tfoot td{font-weight:bold;background:#f4f4f4}</style></head><body><h2>Gill’s Calculator — ${S.mode==='parchi'?'Kanda Parchi':'Hath se Tuli'} Hisaab</h2><p>Date: ${d}</p><table><thead><tr><th>#</th><th>Party</th><th>Wazan</th><th>Kaat</th><th>Net Kilos</th><th>Bags</th><th>Quintal</th><th>Rate/qtl</th><th>Amount</th><th>Labour</th><th>Actual</th></tr></thead><tbody>${tr}</tbody><tfoot><tr><td colspan="2">Total</td><td>${trim(T.gross)}</td><td>${trim(T.kaatKg)}</td><td>${trim(T.kg)}</td><td>${trim(T.bags)}</td><td>${fmt(T.qtl,3)}</td><td></td><td>${fmt(T.amt)}</td><td>${fmt(T.lab)}</td><td>${fmt(T.net)}</td></tr></tfoot></table><p style="margin-top:14px;font-size:12px">Print karke "Save as PDF" bhi kar sakte hain.</p></body></html>`;
 }
 function csv(){
   const R=rows(),T=window._T,q=s=>'"'+String(s).replace(/"/g,'""')+'"';
-  const h=['No','Party','Kilos','Bags','Quintal','Rate/qtl','Amount','Labour','Actual'];
-  const L=[h.join(',')].concat(R.map(x=>[x.no,q(x.name),x.kg,x.bags,x.qtl,x.rate,x.amt.toFixed(2),x.lab.toFixed(2),x.net.toFixed(2)].join(',')));
-  L.push(['','Total',T.kg,T.bags,T.qtl,'',T.amt.toFixed(2),T.lab.toFixed(2),T.net.toFixed(2)].join(','));
+  const h=['No','Party','Wazan','Kaat','Net Kilos','Bags','Quintal','Rate/qtl','Amount','Labour','Actual'];
+  const L=[h.join(',')].concat(R.map(x=>[x.no,q(x.name),x.gross,x.kaatKg,x.kg,x.bags,x.qtl,x.rate,x.amt.toFixed(2),x.lab.toFixed(2),x.net.toFixed(2)].join(',')));
+  L.push(['','Total',T.gross,T.kaatKg,T.kg,T.bags,T.qtl,'',T.amt.toFixed(2),T.lab.toFixed(2),T.net.toFixed(2)].join(','));
   return '\ufeff'+L.join('\n');
 }
 (async()=>{
