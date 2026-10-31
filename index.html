@@ -1,1 +1,158 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gill’s Calculator</title>
+<style>
+:root{--bg:#f6f4ee;--card:#fff;--ink:#1f2a1f;--mute:#6b7466;--line:#e2dfd3;--pri:#2f6b3a;--priInk:#fff;--acc:#b4531a;--soft:#eaf2e8;--box-sizing:border-box;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a14;--card:#1d251d;--ink:#eef2ea;--mute:#9aa595;--line:#2e392e;--pri:#5fb36d;--priInk:#0e1a0f;--acc:#f0a06a;--soft:#243024}}
+:root[data-theme="dark"]{--bg:#141a14;--card:#1d251d;--ink:#eef2ea;--mute:#9aa595;--line:#2e392e;--pri:#5fb36d;--priInk:#0e1a0f;--acc:#f0a06a;--soft:#243024}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px}
+.wrap{max-width:640px;margin:0 auto;padding:14px 12px 40px}
+h1{margin:6px 0 2px;font-size:24px;letter-spacing:.2px}
+.sub{color:var(--mute);font-size:13px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{flex:1;padding:12px 6px;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;font-size:15px;font-weight:600;cursor:pointer}
+.tab.on{background:var(--pri);border-color:var(--pri);color:var(--priInk)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:700}
+.x{background:none;border:none;color:var(--acc);font-size:14px;cursor:pointer;padding:4px 8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.f{display:flex;flex-direction:column;gap:3px}
+.f.full{grid-column:1/-1}
+label{font-size:12px;color:var(--mute)}
+input,select{width:100%;padding:10px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.res{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;font-size:14px}
+.res div{display:flex;justify-content:space-between;padding:2px 0}
+.res .net{font-weight:800;font-size:17px;color:var(--pri);padding-top:6px}
+.add{width:100%;padding:13px;border:2px dashed var(--pri);background:transparent;color:var(--pri);border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:12px}
+.tot{background:var(--soft);border:1px solid var(--pri);border-radius:14px;padding:12px}
+.tot h2{margin:0 0 6px;font-size:16px}
+.tot div{display:flex;justify-content:space-between;padding:3px 0}
+.tot .net{font-size:20px;font-weight:800;border-top:1px solid var(--pri);margin-top:6px;padding-top:8px}
+.dl{display:flex;gap:8px;margin-top:12px}
+.dl button{flex:1;padding:12px 6px;border:none;border-radius:10px;background:var(--pri);color:var(--priInk);font-size:15px;font-weight:700;cursor:pointer}
+.dl button.alt{background:transparent;border:2px solid var(--pri);color:var(--pri)}
+.msg{font-size:13px;color:var(--mute);margin-top:8px;min-height:18px}
+.note{font-size:12px;color:var(--mute);margin:-4px 0 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧅 Gill’s Calculator</h1>
+  <div class="sub">Anaaj Mandi · Kanda Hisaab</div>
+  <div class="tabs">
+    <button class="tab on" id="t-parchi">Kanda Parchi</button>
+    <button class="tab" id="t-tuli">Hath se Tuli</button>
+  </div>
+  <div class="note" id="note"></div>
+  <div id="list"></div>
+  <button class="add" id="add">+ Nayi Parchi Jodein</button>
+  <div class="tot" id="tot"></div>
+  <div class="dl" id="dl" style="display:none">
+    <button id="d-bill">⬇ Bill (HTML/PDF)</button>
+    <button id="d-csv" class="alt">⬇ Excel (CSV)</button>
+  </div>
+  <div class="msg" id="msg"></div>
+</div>
+<script>
+const S={mode:'parchi',parchi:[],tuli:[]};
+const NOTES={parchi:'Kanda parchi: kilo ya quintal daalein. Bags = kilos ÷ bharti. Amount = quintal × rate. Actual = Amount − (bags × labour).',
+tuli:'Hath se tuli: bags aur upar ke extra kilos daalein. Total kilos = (bags × bharti) + extra kilos. Labour sirf bags par kategi.'};
+const n=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
+const fmt=(v,d=2)=>v.toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const rs=v=>'₹ '+fmt(v);
+const trim=v=>v.toLocaleString('en-IN',{maximumFractionDigits:2});
+function blank(prev){return Object.assign({name:'',unit:'kg',w:'',bags:'',extra:'',bharti:'37.5',rate:'',labour:''},prev?{unit:prev.unit,bharti:prev.bharti,rate:prev.rate,labour:prev.labour}:{})}
+function calc(r){
+  let kg,bags;
+  if(S.mode==='parchi'){kg=r.unit==='qtl'?n(r.w)*100:n(r.w);bags=kg/n(r.bharti)}
+  else{bags=n(r.bags);kg=bags*n(r.bharti)+n(r.extra)}
+  const qtl=kg/100,amt=qtl*n(r.rate),lab=bags*n(r.labour);
+  return{kg,bags,qtl,amt,lab,net:amt-lab};
+}
+function cur(){return S[S.mode]}
+function render(){
+  document.getElementById('note').textContent=NOTES[S.mode];
+  const L=document.getElementById('list');L.innerHTML='';
+  cur().forEach((r,i)=>{
+    const c=document.createElement('div');c.className='card';
+    const wf=S.mode==='parchi'
+      ?`<div class="f"><label>Wazan daalein</label><input data-k="w" type="number" inputmode="decimal" value="${r.w}" placeholder="0"></div>
+        <div class="f"><label>Unit</label><select data-k="unit"><option value="kg"${r.unit==='kg'?' selected':''}>Kilo (kg)</option><option value="qtl"${r.unit==='qtl'?' selected':''}>Quintal</option></select></div>`
+      :`<div class="f"><label>Bags</label><input data-k="bags" type="number" inputmode="decimal" value="${r.bags}" placeholder="0"></div>
+        <div class="f"><label>Extra Kilos</label><input data-k="extra" type="number" inputmode="decimal" value="${r.extra}" placeholder="0"></div>`;
+    c.innerHTML=`<div class="ch"><span>${S.mode==='parchi'?'Parchi':'Tuli'} #${i+1}</span><button class="x" data-del="${i}">✕ Hatayein</button></div>
+    <div class="grid">
+      <div class="f full"><label>Party / Naam (optional)</label><input data-k="name" type="text" value="${r.name.replace(/"/g,'&quot;')}"></div>
+      ${wf}
+      <div class="f"><label>Bharti</label><select data-k="bharti"><option value="37.5"${r.bharti==='37.5'?' selected':''}>37.5 kg</option><option value="35"${r.bharti==='35'?' selected':''}>35 kg</option></select></div>
+      <div class="f"><label>Rate (₹ / quintal)</label><input data-k="rate" type="number" inputmode="decimal" value="${r.rate}" placeholder="0"></div>
+      <div class="f full"><label>Labour (₹ / bag)</label><input data-k="labour" type="number" inputmode="decimal" value="${r.labour}" placeholder="0"></div>
+    </div><div class="res"></div>`;
+    c.addEventListener('input',e=>{const k=e.target.dataset.k;if(!k)return;r[k]=e.target.value;upd()});
+    c.addEventListener('change',e=>{const k=e.target.dataset.k;if(!k)return;r[k]=e.target.value;upd()});
+    c.querySelector('[data-del]').onclick=()=>{cur().splice(i,1);if(!cur().length)cur().push(blank());render()};
+    L.appendChild(c);
+  });
+  upd();
+}
+function upd(){
+  const cards=document.querySelectorAll('#list .card');
+  let T={kg:0,bags:0,qtl:0,amt:0,lab:0,net:0};
+  cur().forEach((r,i)=>{
+    const c=calc(r);for(const k in T)T[k]+=c[k];
+    cards[i].querySelector('.res').innerHTML=
+     `<div><span>Total Kilos</span><b>${trim(c.kg)} kg</b></div>
+      <div><span>Bags</span><b>${trim(c.bags)}</b></div>
+      <div><span>Quintal</span><b>${fmt(c.qtl,3)} qtl</b></div>
+      <div><span>Amount</span><b>${rs(c.amt)}</b></div>
+      <div><span>Labour (kaat)</span><b>− ${rs(c.lab)}</b></div>
+      <div class="net"><span>Actual Amount</span><span>${rs(c.net)}</span></div>`;
+  });
+  document.getElementById('tot').innerHTML=
+   `<h2>Kul Hisaab (${cur().length} ${S.mode==='parchi'?'parchi':'tuli'})</h2>
+    <div><span>Total Kilos</span><b>${trim(T.kg)} kg</b></div>
+    <div><span>Total Bags</span><b>${trim(T.bags)}</b></div>
+    <div><span>Total Quintal</span><b>${fmt(T.qtl,3)}</b></div>
+    <div><span>Total Amount</span><b>${rs(T.amt)}</b></div>
+    <div><span>Total Labour (kaat)</span><b>− ${rs(T.lab)}</b></div>
+    <div class="net"><span>Actual Amount</span><span>${rs(T.net)}</span></div>`;
+  window._T=T;
+}
+function setMode(m){S.mode=m;document.getElementById('t-parchi').classList.toggle('on',m==='parchi');document.getElementById('t-tuli').classList.toggle('on',m==='tuli');document.getElementById('add').textContent=m==='parchi'?'+ Nayi Parchi Jodein':'+ Nayi Tuli Jodein';render()}
+document.getElementById('t-parchi').onclick=()=>setMode('parchi');
+document.getElementById('t-tuli').onclick=()=>setMode('tuli');
+document.getElementById('add').onclick=()=>{const a=cur();a.push(blank(a[a.length-1]));render();window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})};
+S.parchi.push(blank());S.tuli.push(blank());render();
 
+const esc=s=>String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+function rows(){return cur().map((r,i)=>({no:i+1,name:r.name,...calc(r),rate:n(r.rate),labour:n(r.labour),bharti:n(r.bharti)}))}
+function billHtml(){
+  const R=rows(),T=window._T,d=new Date().toLocaleDateString('en-IN');
+  const tr=R.map(x=>`<tr><td>${x.no}</td><td>${esc(x.name)}</td><td>${trim(x.kg)}</td><td>${trim(x.bags)}</td><td>${fmt(x.qtl,3)}</td><td>${fmt(x.rate)}</td><td>${fmt(x.amt)}</td><td>${fmt(x.lab)}</td><td><b>${fmt(x.net)}</b></td></tr>`).join('');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Gill’s Calculator Bill</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #999;padding:6px;text-align:right}th{background:#eee}td:nth-child(2){text-align:left}tfoot td{font-weight:bold;background:#f4f4f4}</style></head><body><h2>Gill’s Calculator — ${S.mode==='parchi'?'Kanda Parchi':'Hath se Tuli'} Hisaab</h2><p>Date: ${d}</p><table><thead><tr><th>#</th><th>Party</th><th>Kilos</th><th>Bags</th><th>Quintal</th><th>Rate/qtl</th><th>Amount</th><th>Labour</th><th>Actual</th></tr></thead><tbody>${tr}</tbody><tfoot><tr><td colspan="2">Total</td><td>${trim(T.kg)}</td><td>${trim(T.bags)}</td><td>${fmt(T.qtl,3)}</td><td></td><td>${fmt(T.amt)}</td><td>${fmt(T.lab)}</td><td>${fmt(T.net)}</td></tr></tfoot></table><p style="margin-top:14px;font-size:12px">Print karke "Save as PDF" bhi kar sakte hain.</p></body></html>`;
+}
+function csv(){
+  const R=rows(),T=window._T,q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const h=['No','Party','Kilos','Bags','Quintal','Rate/qtl','Amount','Labour','Actual'];
+  const L=[h.join(',')].concat(R.map(x=>[x.no,q(x.name),x.kg,x.bags,x.qtl,x.rate,x.amt.toFixed(2),x.lab.toFixed(2),x.net.toFixed(2)].join(',')));
+  L.push(['','Total',T.kg,T.bags,T.qtl,'',T.amt.toFixed(2),T.lab.toFixed(2),T.net.toFixed(2)].join(','));
+  return '\ufeff'+L.join('\n');
+}
+(async()=>{
+  let D=null;try{D=await claude.use('downloads')}catch(e){}
+  const msg=document.getElementById('msg');
+  if(!D){D={save:async({filename,data})=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=filename;document.body.appendChild(a);a.click();a.remove()}}}
+  document.getElementById('dl').style.display='flex';
+  const go=async(fn,data)=>{try{await D.save({filename:fn,data});msg.textContent='Save ho gaya ✔'}catch(e){msg.textContent=e&&e.code==='declined'?'Download cancel hua.':'Download nahi ho paya.'}};
+  const stamp=()=>new Date().toISOString().slice(0,10);
+  document.getElementById('d-bill').onclick=()=>go(`gills-${S.mode}-${stamp()}.html`,billHtml());
+  document.getElementById('d-csv').onclick=()=>go(`gills-${S.mode}-${stamp()}.csv`,csv());
+})();
+</script>
+</body>
+</html>
